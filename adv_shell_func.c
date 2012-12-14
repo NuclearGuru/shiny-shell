@@ -4,16 +4,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-void run(char* cmd, char** argv) {
-	int j, fred=0, pid;
+inline void run(char* cmd, char** argv) {
+	int j, fred=0, pid, waitforproc=1;
 	FILE *save_stdout=stdout, *save_stdin=stdin;
-	
-	switch(pid=fork()) {
-		case -1:
-			printf("konnte Kindprozess nicht erstellen");
-			return;
-		case 0: // kindprozess
-			for(j=0;argv[j]!=NULL;j++){
+		for(j=0;argv[j]!=NULL;j++){
 				if(fred!=2 && *argv[j]=='>') {
 					printf("stdout -> %s\n", argv[j+1]);
 					argv[j]=NULL;
@@ -26,7 +20,16 @@ void run(char* cmd, char** argv) {
 					freopen(argv[j+1],"r",stdin);
 					fred=1;
 				}
-			}
+	}
+	if(*argv[j-1]=='&') {
+		waitforproc=0;
+		argv[j-1]=NULL;
+	}
+	switch(pid=fork()) {
+		case -1:
+			printf("konnte Kindprozess nicht erstellen");
+			return;
+		case 0: // kindprozess
 			execvp(argv[0],argv);
 			
 			
@@ -40,7 +43,8 @@ void run(char* cmd, char** argv) {
 			}
 			break;
 		default: // elternprozess
-			wait(NULL);
+			if(waitforproc)
+				wait(NULL);
 			break;
 	}
 }
@@ -81,13 +85,15 @@ inline char **prepare_argv(char *buf, int *buflen, int *argc) {
 				
 				for(j=len-1,k=oldlen-1;k>i+varlen;k--,j--)
 					buf[j]=buf[k];
-				strcpy(buf+i, replace);
+				
+				for(j=i,k=0;k<replen-1;k++,j++)
+					buf[j]=buf[k];
 			}
 		}
 	}
 
-	// TODO Dieses malloc spinnt manchmal, z.b. bei ls -al $HOME
-	argv = (char**)malloc((count+1)*sizeof(char*));
+	// anzahl token + argv[0] + NULL
+	argv = (char**)malloc((count+2)*sizeof(char*));
 	argv[0]=buf;
 	for(j=1,i=0;j<=count;i++)
 		if(buf[i]==' ') {
