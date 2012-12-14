@@ -5,4 +5,4 @@ debug: clean
 	gcc -g -o shell shell.c adv_shell_func.c
 	
 clean:
-	rm -f shell
+	rm -f shell *.o

@@ -8,14 +8,21 @@ int main(void)
 {
 	char * buf, *pwd;
 	char **argv;
-	int argc, buflen=64;
+	int i, buflen=64;
 	
-	buf = (char*)malloc(buflen*sizeof(char));
-	
+	/* die länge von buf kann sich später ändern (per realloc) 
+	 * z.b. beim ersetzen der env-variablen
+	 */
+	buf = (char*)malloc(buflen*sizeof(char));	
 	while(1) {
-		printf("$ ");
-		if ( gets(buf) != NULL ) {
-			
+		{printf("$ ");
+			fgets(buf, buflen-2, stdin);
+		}
+			// fgets ließt \n mit, deshalb dies
+			i = strlen(buf);
+			buf[i-1]='\0';
+			if(*buf==0)
+				continue;
 			if(cmp_str(buf, "exit", 4)) {
 				return 0;
 			}
@@ -23,21 +30,14 @@ int main(void)
 				chdir(buf+3);
 				continue;
 			}
-			if (cmp_str(buf, "pwd", 2)) {
+			if (cmp_str(buf, "pwd", 3)) {
 				getcwd(buf, buflen);
 				printf("%s\n",buf);
 				continue;
 			}
 			 
-				argv = prepare_argv(buf, &buflen, &argc);
+				argv = prepare_argv(buf, &buflen);
 				
-				run(argv[0], argv);
-			
-				/* TODO
-				 * Eigentlich soll man mit malloc allokierten Speicher 
-				 * wieder freigeben, aber hier stört der sich dran
-				 */
-//				free(argv);
-		}
+				run(argv);
     }
 }
