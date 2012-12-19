@@ -6,51 +6,52 @@
 #include <sys/wait.h>
 
 
-inline void run(char** argv) {
-	// fred: merkt sich dateiumlenkungen
-	int j, fred=0, waitforchild=1, pid;
-	
-	// für die dateiumlenkung
-	FILE *save_stdout=stdout, *save_stdin=stdin, *a, *b;
-	
-	for(j=0;argv[j]!=NULL;j++){
-				if(fred!=2 && *argv[j]=='>') {
-					printf("stdout -> %s\n", argv[j+1]);
-					argv[j]=NULL;
-					a = freopen(argv[j+1],"w",stdout);
-					fred=2;
-				}
-				if(fred!=2 && *argv[j]=='<') {
-					printf("stdin <- %s\n", argv[j+1]);
-					argv[j]=NULL;
-					b = freopen(argv[j+1],"r",stdin);
-					fred=1;
-				}
-	}
-	if(*argv[j-1]=='&') {
-		waitforchild=0;
-		argv[j-1]=NULL; // & nicht teil der parameterliste
-	}
-	
-	switch(pid=fork()) {
-		case -1: //fehler
+inline int run(int argc, char** argv) {
+int j, pid, waitforchild=1, fred=0;
+FILE *save_stdout=stdout, *save_stdin=stdin;
+
+		if(*argv[argc-2]=='&') {
+			waitforchild=0;
+			argv[argc-2]=NULL;	
+		}
+
+switch(pid=fork()) {
+	case -1:
 		printf("konnte Kindprozess nicht erstellen");
-			return;
-		case 0: // kindprozess
-			execvp(argv[0],argv);
-			if(fred==2) {
-				fclose(a);
-				stdout=save_stdout;
+		return;
+	case 0: // kindprozess - was hier geändert wird, wirkt sich nicht auf den elternprozess aus.
+		// dateiumlenkung erkennen:
+		for(j=0;argv[j]!=NULL;j++){
+			if(fred!=2 && *argv[j]=='>') {
+				printf("stdout -> %s\n", argv[j+1]);
+				freopen(argv[j+1],"w", stdout);
+				argv[j]=NULL;
+				fred =2;
 			}
-			if(fred>=1) {
-				fclose(b);
-				stdin=save_stdin;
+			if(fred!= 2 && *argv[j]=='<') {
+				printf("stdin <- %s\n", argv[j+1]);
+				freopen(argv[j+1],"r", stdin);
+				argv[j]=NULL;
+				fred=1;
 			}
-			break;
-		default: // elternprozess
-		// TODO auch auf zombies warten
-			if(waitforchild)
-				wait(NULL);
+		}
+		execvp(argv[0],argv);
+		/*
+		if(fred==2) {
+			stdout=save_stdout;
+			fclose(stdout);
+		}
+		if(fred>=1) {
+			stdin=save_stdin;
+			fclose(stdin);
+		}
+		*/
+		return 0;
+	default: // elternprozess
+		if(waitforchild)
+			wait(NULL);
+		return pid;
+		break;
 	}
 }
 
@@ -72,7 +73,7 @@ int cmp_str(const char *a, const char *b, int depth) {
 /* "bereitet" den string vor
  * inline weil ich sie nur einmal aufrufe.
  */
-inline char **prepare_argv(char *buf, int *buflen) {
+inline char **prepare_argv(char *buf, int *buflen, int *argc) {
 	char **argv, var[30], *replace;
 	int len=0, j=0, i=0,k=0, d=0, count=0, oldlen=0, varlen=0,replen=0;
 	
@@ -112,7 +113,8 @@ inline char **prepare_argv(char *buf, int *buflen) {
 	}
 	
 	// anzahl token + argv[0] + NULL
-	argv = (char**)malloc((count+2)*sizeof(char*));
+	*argc=count+2;
+	argv = (char**)malloc((*argc)*sizeof(char*));
 	
 	// die pointer in argv zeigen dann auf stellen in buf
 	// leerzeichen werden durch \0 ersetzt
